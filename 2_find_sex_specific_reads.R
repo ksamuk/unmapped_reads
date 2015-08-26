@@ -3,6 +3,7 @@
 # libraries
 library("ape")
 library("dplyr")
+library("ggplot2")
 
 # fasta file
 
@@ -37,6 +38,9 @@ fasta_to_row <- function(label){
 unmapped.df <- lapply(names(unmapped.fa), fasta_to_row)
 unmapped.df <- bind_rows(unmapped.df)
 write.table(unmapped.df, file = "unmapped.df.txt", quote = FALSE, row.names = FALSE)
+
+
+
 unmapped.df <- read.table(file = "unmapped.df.txt", header = TRUE, stringsAsFactors = FALSE)
 
 # add in sex info and arrange
@@ -113,10 +117,50 @@ loci.common <- male.loci.df %>%
   unique %>%
   .[,1]
 
-loci.white.only <- loci.white [!(loci.white %in% loci.common)]
+loci.both <- loci.common [loci.common %in% loci.white]
 
-male.loci.df %>%
-  filter(c.locus %in% loci.white.only)
+count.df <- male.loci.df %>%
+  filter(c.locus %in% loci.both) %>%
+  group_by(c.locus, membership, sequence) %>%
+  tally() %>%
+  ungroup 
 
-# sequences specific to the white stickleback?
+# count variant frequenies:
+
+calc_allele_freq <- function(locus){
+  
+  # subset out a locus
+  locus.sub <- count.df %>%
+    filter(c.locus == locus)
+  
+  # assign alleles an id
+  alleles <- unique(locus.sub$sequence)
+  locus.sub$allele <- match(locus.sub$sequence, alleles)
+  
+  # calculate allele frequecies per membership
+  locus.sub <- locus.sub %>%
+    group_by(membership) %>%
+    mutate(freq = n / sum(n)) %>%
+    ungroup
+  
+  
+  
+  return(locus.sub)
+  
+}
+
+locus.list <- unique(count.df$c.locus)
+
+frq.df <- lapply(locus.list, calc_allele_freq)
+frq.df <- bind_rows(frq.df)
+
+frq.df %>%
+  .[,-3] %>%
+  group_by(c.locus) %>%
+  mutate(num.alleles = max(allele)) %>%
+  ungroup %>%
+  filter(num.alleles > 1) %>%
+    ggplot(aes(y = freq, x = allele, color = as.factor(membership)))+
+    geom_point(size = 3 ) +
+    facet_wrap(~c.locus)
 
