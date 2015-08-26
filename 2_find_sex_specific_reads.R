@@ -37,7 +37,7 @@ fasta_to_row <- function(label){
 unmapped.df <- lapply(names(unmapped.fa), fasta_to_row)
 unmapped.df <- bind_rows(unmapped.df)
 write.table(unmapped.df, file = "unmapped.df.txt", quote = FALSE, row.names = FALSE)
-unmapped.df <- read.table(file = "unmapped.df.txt", hheader = TRUE, stringsAsFactors = FALSe)
+unmapped.df <- read.table(file = "unmapped.df.txt", header = TRUE, stringsAsFactors = FALSE)
 
 # add in sex info and arrange
 unmapped.df <- left_join(id.sex, unmapped.df)
@@ -67,7 +67,6 @@ loci.females <- unmapped.df %>%
 
 # find that loci that *only* occur in males
 loci.male.only <- loci.males [!(loci.males %in% loci.females)]
-loci.female.only <- loci.females [!(loci.females %in% loci.males)]
 
 male.loci.df <- unmapped.df %>%
   filter(c.locus %in% loci.male.only)
@@ -81,13 +80,11 @@ species.dat <- species.dat %>%
 
 species.dat$id <- species.dat$id %>% paste0("_2014")
 
+# join in cluster data for individuals who have it 
 male.loci.df <- left_join(male.loci.df, species.dat)
 male.loci.df$pop <- substr(male.loci.df$id, 1, 2)
 
-male.loci.df$membership[is.na(male.loci.df$membership)] <- lapply(male.loci.df$pop[is.na(male.loci.df$membership)], fake_memberships) %>% unlist
-  
-
-
+# use population assignments to approximate species for individuals missing cluster data
 fake_memberships <- function (pop){
   if (pop %in% c("WR", "PQ", "CP", "SK", "BR", "AL", "MR")){
     return(1)
@@ -96,3 +93,30 @@ fake_memberships <- function (pop){
   }
   
 }
+
+male.loci.df$membership[is.na(male.loci.df$membership)] <- lapply(male.loci.df$pop[is.na(male.loci.df$membership)], fake_memberships) %>% unlist
+  
+# c.loci spefici to whtstbk?
+# result: nope
+
+loci.white <- male.loci.df %>%
+  filter(membership == 2) %>%
+  filter(!is.na(c.locus)) %>%
+  select(c.locus) %>%
+  unique %>%
+  .[,1]
+
+loci.common <- male.loci.df %>%
+  filter(membership == 1) %>%
+  filter(!is.na(c.locus)) %>%
+  select(c.locus) %>%
+  unique %>%
+  .[,1]
+
+loci.white.only <- loci.white [!(loci.white %in% loci.common)]
+
+male.loci.df %>%
+  filter(c.locus %in% loci.white.only)
+
+# sequences specific to the white stickleback?
+
